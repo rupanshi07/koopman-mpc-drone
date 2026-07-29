@@ -2,6 +2,7 @@
 import os
 import sys
 from gym_pybullet_drones.envs.CtrlAviary import CtrlAviary
+from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
 from gym_pybullet_drones.utils.enums import DroneModel, Physics
 import pybullet as p
 
@@ -22,6 +23,7 @@ env = CtrlAviary(
 )
 
 obs, info = env.reset()
+ctrl = DSLPIDControl(drone_model=DroneModel.CF2X)
 
 EXTRA_PAYLOAD_MASS = 0.0
 WIND_FORCE = np.array([0.0, 0.0, 0.0])
@@ -38,20 +40,29 @@ log_states = []
 log_actions = []
 reset_count = 0
 
-HOVER_RPM = 16000
-RPM_RANGE = 250          # reduced: less tipping moment from motor-to-motor differences
-HOLD_STEPS = 10
-BASELINE_AMPLITUDE = 2000  # increased: stronger common climbing thrust
-
-current_action = HOVER_RPM + np.random.uniform(-RPM_RANGE, RPM_RANGE, size=(1,4))
+# Randomized target waypoints - PID keeps the drone upright while flying to
+# these varying heights/positions, giving us diverse-but-stable training data.
+TARGET_HOLD_STEPS = 96   # ~2 seconds per target
+current_target = np.array([0.0, 0.0, 0.3])
 
 for step in range(NUM_STEPS):
-    if step % HOLD_STEPS == 0:
-        baseline_offset = BASELINE_AMPLITUDE * np.sin(2 * np.pi * step / NUM_STEPS * 3)
-        noise = np.random.uniform(-RPM_RANGE, RPM_RANGE, size=(1,4))
-        current_action = HOVER_RPM + baseline_offset + noise
+    if step % TARGET_HOLD_STEPS == 0:
+        current_target = np.array([
+            np.random.uniform(-0.3, 0.3),
+            np.random.uniform(-0.3, 0.3),
+            np.random.uniform(0.1, 1.2)
+        ])
 
-    obs, reward, terminated, truncated, info = env.step(current_action)
+    state = obs[0]
+    rpm, _, _ = ctrl.computeControlFromState(
+        control_timestep=1/CTRL_FREQ,
+        state=state,
+        target_pos=current_target,
+        target_rpy=np.array([0, 0, 0])
+    )
+    action = rpm.reshape(1, 4)
+
+    obs, reward, terminated, truncated, info = env.step(action)
 
     if CONDITION == "windy":
         p.applyExternalForce(
@@ -68,7 +79,7 @@ for step in range(NUM_STEPS):
         PAYLOAD_APPLIED = True
 
     log_states.append(obs[0].copy())
-    log_actions.append(current_action[0].copy())
+    log_actions.append(action[0].copy())
 
     if terminated or truncated:
         obs, info = env.reset()
@@ -82,5 +93,7 @@ log_actions = np.array(log_actions)
 
 np.savez(f"{SAVE_DIR}/flight_log.npz", states=log_states, actions=log_actions)
 z = log_states[:,2]
+roll = log_states[:,7]
 print(f"[{CONDITION}] Saved {log_states.shape[0]} steps, {reset_count} resets")
-print(f"Z range covered: min={z.min():.3f}, max={z.max():.3f}, mean={z.mean():.3f}")
+print(f"Z range: min={z.min():.3f}, max={z.max():.3f}, mean={z.mean():.3f}")
+print(f"Roll range: min={roll.min():.3f}, max={roll.max():.3f}, std={roll.std():.3f}")

@@ -27,15 +27,15 @@ def normalize_state(x_raw):
 def denormalize_action(u_norm):
     return u_norm * u_std + u_mean
 
-HORIZON = 10
-HOVER_RPM = 16000
+HORIZON = 6
+HOVER_RPM = 14436
 
 target_state_raw = np.zeros(N_STATE)
 target_state_raw[2] = 0.5
 target_state_raw[6] = 1.0
 target_lifted = lift(normalize_state(target_state_raw))
 
-_last_u_norm = np.zeros(N_ACTION)  # persists across calls for smoothing
+_last_u_norm = np.zeros(N_ACTION)
 
 def solve_mpc(current_state_raw):
     global _last_u_norm
@@ -48,10 +48,11 @@ def solve_mpc(current_state_raw):
     cost = 0
     constraints = [Psi[0] == psi0]
 
-    Q_weight = 10.0
-    R_weight = 1.0       # increased: penalize large control magnitude more
-    DU_weight = 5.0      # NEW: penalize change from previous command (smoothing)
-    U_BOUND = 30.0        # further loosened
+    Q_weight = 20.0    # moderate tracking priority (was 100, too aggressive)
+    R_weight = 0.1
+    DU_weight = 1.0    # moderate smoothing (was 0.1, too loose)
+    U_BOUND = 4.0
+    MAX_RATE = 1.0     # HARD constraint: max normalized change per step
 
     prev_u = _last_u_norm
     for t in range(HORIZON):
@@ -60,10 +61,12 @@ def solve_mpc(current_state_raw):
         cost += R_weight * cp.sum_squares(U[t])
         cost += DU_weight * cp.sum_squares(U[t] - prev_u)
         constraints += [U[t] <= U_BOUND, U[t] >= -U_BOUND]
+        # Hard rate limit: prevents the pathological jump-to-extreme behavior
+        constraints += [U[t] - prev_u <= MAX_RATE, U[t] - prev_u >= -MAX_RATE]
         prev_u = U[t]
 
     problem = cp.Problem(cp.Minimize(cost), constraints)
-    problem.solve(solver=cp.OSQP, verbose=False)
+    problem.solve(solver=cp.OSQP, verbose=False, eps_abs=1e-5, eps_rel=1e-5, max_iter=20000)
 
     if U.value is None:
         print("WARNING: MPC solve failed, holding hover RPM")

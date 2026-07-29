@@ -4,7 +4,7 @@ import time
 from gym_pybullet_drones.envs.CtrlAviary import CtrlAviary
 from gym_pybullet_drones.utils.enums import DroneModel, Physics
 sys.path.insert(0, "src/mpc")
-from mpc_controller import solve_mpc, CONDITION as TRAINED_CONDITION
+from mpc_controller import solve_mpc
 
 RUN_CONDITION = sys.argv[1] if len(sys.argv) > 1 else "nominal"
 DURATION_SEC = 10
@@ -24,9 +24,10 @@ obs, info = env.reset()
 
 log_states = []
 log_actions = []
+reset_count = 0
 
 for step in range(NUM_STEPS):
-    current_state = obs[0][:16]  # drop RPM columns, keep 16 physical states
+    current_state = obs[0][:16]
     action = solve_mpc(current_state)
     action = action.reshape(1, 4)
 
@@ -37,10 +38,11 @@ for step in range(NUM_STEPS):
 
     if step % 48 == 0:
         z = obs[0][2]
-        print(f"t={step/CTRL_FREQ:.1f}s | Z={z:.3f}m | target=0.5m")
+        print(f"t={step/CTRL_FREQ:.1f}s | Z={z:.3f}m | target=0.5m | terminated={terminated} | truncated={truncated}")
 
     if terminated or truncated:
-        print("Drone terminated/crashed - resetting")
+        reset_count += 1
+        print(f"  >>> RESET #{reset_count} at step {step} (t={step/CTRL_FREQ:.2f}s)")
         obs, info = env.reset()
 
 env.close()
@@ -48,4 +50,4 @@ env.close()
 log_states = np.array(log_states)
 log_actions = np.array(log_actions)
 np.savez(f"results/mpc_test_{RUN_CONDITION}.npz", states=log_states, actions=log_actions)
-print(f"Saved MPC test run to results/mpc_test_{RUN_CONDITION}.npz")
+print(f"Saved MPC test run. Total resets: {reset_count}")
