@@ -1,4 +1,4 @@
-import numpy as np
+﻿import numpy as np
 import os
 import sys
 from gym_pybullet_drones.envs.CtrlAviary import CtrlAviary
@@ -39,14 +39,17 @@ log_actions = []
 reset_count = 0
 
 HOVER_RPM = 16000
-RPM_RANGE = 800       # reduced from 3000 - gentler excitation
-HOLD_STEPS = 10        # hold each random RPM setpoint for 10 steps (~0.2s)
+RPM_RANGE = 250          # reduced: less tipping moment from motor-to-motor differences
+HOLD_STEPS = 10
+BASELINE_AMPLITUDE = 2000  # increased: stronger common climbing thrust
 
 current_action = HOVER_RPM + np.random.uniform(-RPM_RANGE, RPM_RANGE, size=(1,4))
 
 for step in range(NUM_STEPS):
     if step % HOLD_STEPS == 0:
-        current_action = HOVER_RPM + np.random.uniform(-RPM_RANGE, RPM_RANGE, size=(1,4))
+        baseline_offset = BASELINE_AMPLITUDE * np.sin(2 * np.pi * step / NUM_STEPS * 3)
+        noise = np.random.uniform(-RPM_RANGE, RPM_RANGE, size=(1,4))
+        current_action = HOVER_RPM + baseline_offset + noise
 
     obs, reward, terminated, truncated, info = env.step(current_action)
 
@@ -78,4 +81,6 @@ log_states = np.array(log_states)
 log_actions = np.array(log_actions)
 
 np.savez(f"{SAVE_DIR}/flight_log.npz", states=log_states, actions=log_actions)
-print(f"[{CONDITION}] Saved {log_states.shape[0]} steps, {reset_count} resets during flight")
+z = log_states[:,2]
+print(f"[{CONDITION}] Saved {log_states.shape[0]} steps, {reset_count} resets")
+print(f"Z range covered: min={z.min():.3f}, max={z.max():.3f}, mean={z.mean():.3f}")
