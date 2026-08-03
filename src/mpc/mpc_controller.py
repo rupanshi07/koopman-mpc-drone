@@ -1,4 +1,4 @@
-﻿import numpy as np
+import numpy as np
 import cvxpy as cp
 from itertools import combinations
 
@@ -33,6 +33,12 @@ _last_u_norm = np.zeros(N_ACTION)
 
 def solve_mpc(current_state_raw, condition="nominal"):
     global _last_u_norm
+    
+    if np.any(np.isnan(current_state_raw)) or np.any(np.isinf(current_state_raw)) or np.any(np.abs(current_state_raw) > 1e4):
+        model = load_model(condition)
+        u0_raw = _last_u_norm * model["u_std"] + model["u_mean"]
+        return np.clip(u0_raw, 0, 25000)
+
     model = load_model(condition)
     A, B = model["A"], model["B"]
     x_mean, x_std = model["x_mean"], model["x_std"]
@@ -68,9 +74,12 @@ def solve_mpc(current_state_raw, condition="nominal"):
         prev_u = U[t]
 
     problem = cp.Problem(cp.Minimize(cost), constraints)
-    problem.solve(solver=cp.OSQP, verbose=False, eps_abs=1e-5, eps_rel=1e-5, max_iter=20000)
+    try:
+        problem.solve(solver=cp.CLARABEL, verbose=False)
+    except cp.error.SolverError:
+        pass # U.value will remain None, handled below
 
-    if U.value is None:
+    if U.value is None or np.any(np.isnan(U.value)):
         # Safer fallback: hold previous command instead of jumping to hover
         u0_raw = _last_u_norm * u_std + u_mean
         return np.clip(u0_raw, 0, 25000)
