@@ -25,7 +25,7 @@ def lift(x, cross_pairs):
     cross = np.array([x[i] * x[j] for i, j in cross_pairs])
     return np.concatenate([x, quad, cross])
 
-FINAL_TARGET_Z = 0.3
+FINAL_TARGET_Z = 0.1125
 RAMP_RATE = 0.001  # max height increase per control step - gentle climb, not a jump
 
 STATE_WEIGHT = np.ones(N_STATE)
