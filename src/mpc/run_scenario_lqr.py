@@ -2,32 +2,23 @@ import numpy as np
 import sys
 from gym_pybullet_drones.envs.CtrlAviary import CtrlAviary
 from gym_pybullet_drones.utils.enums import DroneModel, Physics
-from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
 import pybullet as p
 
+sys.path.insert(0, "src/mpc")
 sys.path.insert(0, "src/env_selector")
+from lqr_controller import solve_lqr
 from env_selector import select_environment
 
 # ---- SCENARIO CONFIG (same as run_scenario.py) ----
-# scenario 1: nominal env, nominal dynamics (selector on)
-# scenario 2: windy env, nominal dynamics (selector OFF - ablation)
-# scenario 3: windy env, windy dynamics (selector on)
-# scenario 4: varying env nominal->windy (selector on)
-# scenario 5: payload added mid-flight, no wind (selector on)
-# scenario 6: payload added mid-flight + wind active throughout (combined disturbance, selector on)
 SCENARIO = sys.argv[1] if len(sys.argv) > 1 else "1"
 
 CTRL_FREQ = 48
 DURATION_SEC = 15
 NUM_STEPS = DURATION_SEC * CTRL_FREQ
-SELECTOR_WINDOW = 240  # 5 seconds, matching base paper
+SELECTOR_WINDOW = 240
 
 EXTRA_PAYLOAD_MASS = 0.01
-PAYLOAD_ONSET_STEP = NUM_STEPS // 2  # mid-flight
-
-# Match the same target the Koopman-MPC controller ramps toward
-FINAL_TARGET_Z = 0.1125
-RAMP_RATE = 0.001
+PAYLOAD_ONSET_STEP = NUM_STEPS // 2
 
 precision = np.load("data/environment_selector_precision.npz")
 precision_dict = {c: precision[c] for c in ["nominal", "windy", "payload"]}
@@ -39,9 +30,6 @@ env = CtrlAviary(
 obs, info = env.reset()
 DRONE_ID = env.DRONE_IDS[0]
 
-# Initialize the PID controller
-ctrl = DSLPIDControl(drone_model=DroneModel.CF2X)
-
 WIND_FORCE = np.array([0.05, 0.0, 0.0])
 state_buffer = []
 log_states, log_actions, log_selected = [], [], []
@@ -49,8 +37,6 @@ log_states, log_actions, log_selected = [], [], []
 active_condition = "nominal"
 payload_applied = False
 disturbance_onset_step = None
-
-current_target_z = None  # ramping target, set on first step
 
 for step in range(NUM_STEPS):
     apply_wind = False
@@ -81,8 +67,6 @@ for step in range(NUM_STEPS):
     if len(state_buffer) > SELECTOR_WINDOW:
         state_buffer.pop(0)
 
-    # Keep the environment selector running for logging parity with the MPC run,
-    # even though PID doesn't use "condition" internally
     use_selector = SCENARIO != "2"
     if use_selector and step % SELECTOR_WINDOW == 0 and len(state_buffer) == SELECTOR_WINDOW:
         window = np.array(state_buffer)
@@ -90,29 +74,7 @@ for step in range(NUM_STEPS):
     elif not use_selector:
         active_condition = "nominal"
 
-    # Ramp target height, same as MPC controller
-    if current_target_z is None:
-        current_target_z = current_state[2]
-    if current_target_z < FINAL_TARGET_Z:
-        current_target_z = min(current_target_z + RAMP_RATE, FINAL_TARGET_Z)
-
-    cur_pos = current_state[0:3]
-    cur_quat = current_state[3:7]
-    cur_vel = current_state[10:13]
-    cur_ang_vel = current_state[13:16]
-
-    target_pos = np.array([0, 0, current_target_z])
-    target_rpy = np.array([0, 0, 0])
-
-    action, pos_error, yaw_error = ctrl.computeControl(
-        control_timestep=1 / CTRL_FREQ,
-        cur_pos=cur_pos,
-        cur_quat=cur_quat,
-        cur_vel=cur_vel,
-        cur_ang_vel=cur_ang_vel,
-        target_pos=target_pos,
-        target_rpy=target_rpy
-    )
+    action = solve_lqr(current_state, condition=active_condition)
     action = action.reshape(1, 4)
 
     obs, reward, terminated, truncated, info = env.step(action)
@@ -131,10 +93,10 @@ for step in range(NUM_STEPS):
 
 env.close()
 
-np.savez(f"results/pid_scenario_{SCENARIO}.npz",
+np.savez(f"results/lqr_scenario_{SCENARIO}.npz",
          states=np.array(log_states),
          actions=np.array(log_actions),
          selected=np.array(log_selected),
          disturbance_onset_step=disturbance_onset_step if disturbance_onset_step is not None else -1)
-print(f"Saved results/pid_scenario_{SCENARIO}.npz "
+print(f"Saved results/lqr_scenario_{SCENARIO}.npz "
       f"(disturbance onset step: {disturbance_onset_step})")
