@@ -1,4 +1,4 @@
-import numpy as np
+﻿import numpy as np
 import sys
 from gym_pybullet_drones.envs.CtrlAviary import CtrlAviary
 from gym_pybullet_drones.utils.enums import DroneModel, Physics
@@ -26,7 +26,7 @@ EXTRA_PAYLOAD_MASS = 0.01
 PAYLOAD_ONSET_STEP = NUM_STEPS // 2  # mid-flight
 
 # Match the same target the Koopman-MPC controller ramps toward
-FINAL_TARGET_Z = 0.1125
+FINAL_TARGET_Z = 0.3
 RAMP_RATE = 0.001
 
 precision = np.load("data/environment_selector_precision.npz")

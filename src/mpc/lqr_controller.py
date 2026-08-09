@@ -1,4 +1,4 @@
-import numpy as np
+﻿import numpy as np
 from scipy.linalg import solve_discrete_are
 from scipy.signal import cont2discrete
 import pybullet as p
@@ -56,7 +56,7 @@ R = np.diag([0.5, 0.5, 0.5, 0.5])
 P = solve_discrete_are(Ad, Bd, Q, R)
 K = np.linalg.inv(R + Bd.T @ P @ Bd) @ (Bd.T @ P @ Ad)
 
-FINAL_TARGET_Z = 0.1125
+FINAL_TARGET_Z = 0.3
 RAMP_RATE = 0.001
 _current_target_z = None
 
