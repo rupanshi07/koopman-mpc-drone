@@ -50,6 +50,9 @@ os.makedirs(OUT_DIR, exist_ok=True)
 
 CTRL_FREQ = 48
 DT = 1.0 / CTRL_FREQ
+DURATION_SEC_TOTAL = 15  # matches DURATION_SEC in run_scenario*.py
+DISTURBANCE_ONSET_S = 7.5  # wind transition / payload drop trigger, matches
+                            # NUM_STEPS // 2 in run_scenario*.py
 
 FINAL_TARGET_Z = 0.1125
 
@@ -651,6 +654,63 @@ def winner_summary(df):
 
 
 # ============================================================
+# COMPLETION / CRASH-RATE SUMMARY
+# ============================================================
+
+def completion_summary(df):
+    """
+    One row per (scenario, controller) giving whether the run
+    survived the full 15s, and if not, how much of the scenario
+    it actually completed and why it failed.
+
+    This matters here specifically because MPC crashes in every
+    single scenario (see failure_reason), which silently makes
+    several disturbance-specific metrics (settling_time_s,
+    max_transient_deviation_m) come out as NaN -- not because of
+    a data problem, but because MPC is down before the disturbance
+    (wind transition / payload drop, both at t=7.5s) ever triggers
+    in scenarios 4-6. This table makes that visible instead of
+    leaving it implicit in blank cells elsewhere.
+    """
+
+    rows = []
+
+    for _, row in df.iterrows():
+
+        completed_pct = 100.0 * row["valid_duration_s"] / DURATION_SEC_TOTAL
+
+        rows.append({
+
+            "scenario":
+                row["scenario"],
+
+            "scenario_label":
+                row["scenario_label"],
+
+            "controller":
+                row["controller"],
+
+            "completed":
+                not bool(row["crash_flag"]),
+
+            "duration_completed_s":
+                row["valid_duration_s"],
+
+            "pct_scenario_completed":
+                completed_pct,
+
+            "failure_reason":
+                row["failure_reason"],
+
+            "failed_before_disturbance_onset":
+                bool(row["crash_flag"]) and
+                (row["failure_time_s"] < DISTURBANCE_ONSET_S)
+        })
+
+    return pd.DataFrame(rows)
+
+
+# ============================================================
 # PLOTS
 # ============================================================
 
@@ -885,6 +945,74 @@ def create_plots(df):
 
         plt.close(fig)
 
+    # --------------------------------------------------------
+    # 4. Completion rate (% of scenario survived before failure)
+    # --------------------------------------------------------
+
+    fig, ax = plt.subplots(
+        figsize=(12, 6)
+    )
+
+    for i, controller in enumerate(
+        ["MPC", "PID", "LQR"]
+    ):
+
+        sub = df[
+            df["controller"] == controller
+        ].set_index("scenario")
+
+        values = [
+            100.0 * sub["valid_duration_s"].get(s, np.nan) / DURATION_SEC_TOTAL
+            for s in SCENARIOS
+        ]
+
+        ax.bar(
+            x + (i - 1) * width,
+            values,
+            width,
+            label=controller
+        )
+
+    ax.set_xticks(x)
+
+    ax.set_xticklabels(
+        [f"S{s}" for s in SCENARIOS]
+    )
+
+    ax.set_ylabel(
+        "% of Scenario Completed Before Failure"
+    )
+
+    ax.set_xlabel(
+        "Scenario"
+    )
+
+    ax.set_ylim(0, 105)
+
+    ax.set_title(
+        "Completion Rate: how much of each 15s run each "
+        "controller survived"
+    )
+
+    ax.legend()
+
+    ax.grid(
+        axis="y",
+        alpha=0.3
+    )
+
+    fig.tight_layout()
+
+    fig.savefig(
+        os.path.join(
+            OUT_DIR,
+            "completion_rate_comparison.png"
+        ),
+        dpi=200
+    )
+
+    plt.close(fig)
+
 
 # ============================================================
 # MAIN
@@ -954,6 +1082,26 @@ def main():
 
     print(
         f"Saved: {winner_path}"
+    )
+
+    # --------------------------------------------------------
+    # Completion / crash-rate summary
+    # --------------------------------------------------------
+
+    completion = completion_summary(df)
+
+    completion_path = os.path.join(
+        OUT_DIR,
+        "completion_summary_final.csv"
+    )
+
+    completion.to_csv(
+        completion_path,
+        index=False
+    )
+
+    print(
+        f"Saved: {completion_path}"
     )
 
     # --------------------------------------------------------
