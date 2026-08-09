@@ -58,3 +58,5 @@ Across every metric and every scenario, PID or LQR wins
 (`best_controller_summary_final.csv`) — Koopman-MPC does not win a single
 metric in any scenario, and does not survive any scenario to completion.
 `completion_rate_comparison.png` is the clearest single figure for this.
+## Update following direct isolation testing
+Further isolated testing (holding a fixed hover target with zero commanded climb and zero disturbance applied) confirmed that the MPC instability is not specific to reaching disturbance trigger times or climbing to target height. The controller becomes unstable even during plain, undisturbed hovering, indicating a fundamental limitation in the current Koopman lifting function's orientation representation (Euler angles and quaternions), consistent with known singularity issues described in related published work (Narayanan et al., SE(3) Koopman-MPC, IFAC-PapersOnLine, 2023). This is a more precise characterization than 'MPC does not survive long enough to reach the disturbance' -- MPC does not survive independent of any disturbance at all.
