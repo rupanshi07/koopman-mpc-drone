@@ -1,4 +1,4 @@
-"""
+﻿"""
 FINAL Metrics, Analysis, and Comparison
 ----------------------------------------
 
@@ -54,7 +54,7 @@ DURATION_SEC_TOTAL = 15  # matches DURATION_SEC in run_scenario*.py
 DISTURBANCE_ONSET_S = 7.5  # wind transition / payload drop trigger, matches
                             # NUM_STEPS // 2 in run_scenario*.py
 
-FINAL_TARGET_Z = 0.1125
+FINAL_TARGET_Z = 0.3
 
 # Physical hover RPM:
 # sqrt(m*g / (4*KF))
@@ -911,7 +911,7 @@ def create_plots(df):
             FINAL_TARGET_Z - SETTLE_TOL,
             FINAL_TARGET_Z + SETTLE_TOL,
             alpha=0.10,
-            label="±1 cm settling band"
+            label="Â±1 cm settling band"
         )
 
         ax.set_xlabel(
