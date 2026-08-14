@@ -420,9 +420,7 @@ literature-grounded next step to resolve it.
 3. M. O. Williams, I. G. Kevrekidis, and C. W. Rowley, "A Data–Driven Approximation
    of the Koopman Operator: Extending Dynamic Mode Decomposition," *Journal of
    Nonlinear Science*, vol. 25, no. 6, pp. 1307–1346, 2015.
-4. `gym-pybullet-drones` — [https://github.com/utiasDSL/gym-pybullet-drones](https://github.com/utiasDSL/gym-pybullet-drones)
-5. `KoopmanMPC_Quadrotor` (reference implementation) —
-   [https://github.com/sriram-2502/KoopmanMPC_Quadrotor](https://github.com/sriram-2502/KoopmanMPC_Quadrotor)
+
 
 ---
 
