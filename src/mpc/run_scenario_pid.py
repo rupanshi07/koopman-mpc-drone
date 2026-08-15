@@ -8,29 +8,22 @@ import pybullet as p
 sys.path.insert(0, "src/env_selector")
 from env_selector import select_environment
 
-# ---- SCENARIO CONFIG (same as run_scenario.py) ----
-# scenario 1: nominal env, nominal dynamics (selector on)
-# scenario 2: windy env, nominal dynamics (selector OFF - ablation)
-# scenario 3: windy env, windy dynamics (selector on)
-# scenario 4: varying env nominal->windy (selector on)
-# scenario 5: payload added mid-flight, no wind (selector on)
-# scenario 6: payload added mid-flight + wind active throughout (combined disturbance, selector on)
 SCENARIO = sys.argv[1] if len(sys.argv) > 1 else "1"
 
 CTRL_FREQ = 48
 DURATION_SEC = 15
 NUM_STEPS = DURATION_SEC * CTRL_FREQ
-SELECTOR_WINDOW = 240  # 5 seconds, matching base paper
+SELECTOR_WINDOW = 240
 
 EXTRA_PAYLOAD_MASS = 0.01
-PAYLOAD_ONSET_STEP = NUM_STEPS // 2  # mid-flight
+PAYLOAD_ONSET_STEP = NUM_STEPS // 2
 
-# Match the same target the Koopman-MPC controller ramps toward
 FINAL_TARGET_Z = 0.3
 RAMP_RATE = 0.001
 
 precision = np.load("data/environment_selector_precision.npz")
 precision_dict = {c: precision[c] for c in ["nominal", "windy", "payload"]}
+HOVER_RPM = float(precision["hover_rpm"])
 
 env = CtrlAviary(
     drone_model=DroneModel.CF2X, num_drones=1,
@@ -39,18 +32,17 @@ env = CtrlAviary(
 obs, info = env.reset()
 DRONE_ID = env.DRONE_IDS[0]
 
-# Initialize the PID controller
 ctrl = DSLPIDControl(drone_model=DroneModel.CF2X)
 
 WIND_FORCE = np.array([0.05, 0.0, 0.0])
 state_buffer = []
+action_buffer = []
 log_states, log_actions, log_selected = [], [], []
 
 active_condition = "nominal"
 payload_applied = False
 disturbance_onset_step = None
-
-current_target_z = None  # ramping target, set on first step
+current_target_z = None
 
 for step in range(NUM_STEPS):
     apply_wind = False
@@ -81,16 +73,14 @@ for step in range(NUM_STEPS):
     if len(state_buffer) > SELECTOR_WINDOW:
         state_buffer.pop(0)
 
-    # Keep the environment selector running for logging parity with the MPC run,
-    # even though PID doesn't use "condition" internally
     use_selector = SCENARIO != "2"
-    if use_selector and step % SELECTOR_WINDOW == 0 and len(state_buffer) == SELECTOR_WINDOW:
-        window = np.array(state_buffer)
-        active_condition, dists = select_environment(window, precision_dict)
+    if use_selector and step % SELECTOR_WINDOW == 0 and len(state_buffer) == SELECTOR_WINDOW and len(action_buffer) == SELECTOR_WINDOW:
+        s_window = np.array(state_buffer)
+        a_window = np.array(action_buffer)
+        active_condition, dists = select_environment(s_window, a_window, precision_dict, HOVER_RPM)
     elif not use_selector:
         active_condition = "nominal"
 
-    # Ramp target height, same as MPC controller
     if current_target_z is None:
         current_target_z = current_state[2]
     if current_target_z < FINAL_TARGET_Z:
@@ -106,16 +96,17 @@ for step in range(NUM_STEPS):
 
     action, pos_error, yaw_error = ctrl.computeControl(
         control_timestep=1 / CTRL_FREQ,
-        cur_pos=cur_pos,
-        cur_quat=cur_quat,
-        cur_vel=cur_vel,
-        cur_ang_vel=cur_ang_vel,
-        target_pos=target_pos,
-        target_rpy=target_rpy
+        cur_pos=cur_pos, cur_quat=cur_quat,
+        cur_vel=cur_vel, cur_ang_vel=cur_ang_vel,
+        target_pos=target_pos, target_rpy=target_rpy
     )
     action = action.reshape(1, 4)
 
     obs, reward, terminated, truncated, info = env.step(action)
+
+    action_buffer.append(action[0].copy())
+    if len(action_buffer) > SELECTOR_WINDOW:
+        action_buffer.pop(0)
 
     log_states.append(obs[0].copy())
     log_actions.append(action[0].copy())
