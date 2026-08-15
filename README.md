@@ -32,9 +32,6 @@
 | `results/` | All `.npz` flight logs, tracking plots, and metrics CSVs for MPC, PID, and LQR |
 | `results/analysis/` | Final metrics tables and the analysis-specific findings notes |
 | `results/plots_updated/` | Corrected, current Z-tracking comparison plots (all 3 controllers, all 6 scenarios) |
-| `notebooks/` | Jupyter notebooks reproducing the full pipeline and a results-only presentation notebook |
-| `presentation/` | Project presentation slides (PPT) |
-| `report/` | This report, exported as PDF |
 | `README.md` | This file "” full project report |
 
 ---
