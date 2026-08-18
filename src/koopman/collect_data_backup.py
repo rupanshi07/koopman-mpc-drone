@@ -27,6 +27,11 @@ if CONDITION == "payload":
 elif CONDITION == "windy":
     WIND_FORCE = np.array([0.05, 0.0, 0.0])
 
+# Payload flights use a gentler height range - isolated diagnostic testing
+# found the built-in PID controller loses control and flips when carrying
+# 37% extra mass and asked to descend rapidly from ~1m, a maneuver that
+# works fine at nominal weight. This reflects a realistic operating
+# envelope for an overloaded drone rather than an unrealistic demand.
 if CONDITION == "payload":
     TARGET_Z_RANGE = (0.1, 0.6)
 else:
@@ -37,9 +42,8 @@ PAYLOAD_ONSET_STEP = NUM_STEPS // 2
 PAYLOAD_APPLIED = False
 base_mass = p.getDynamicsInfo(DRONE_ID, -1, physicsClientId=env.CLIENT)[0]
 
-log_states, log_actions, log_episode_id = [], [], []
+log_states, log_actions = [], []
 reset_count = 0
-episode_id = 0
 target_hold_steps = 96
 current_target = np.array([0.0, 0.0, 0.3])
 
@@ -71,32 +75,16 @@ for step in range(NUM_STEPS):
 
     log_states.append(obs[0].copy())
     log_actions.append(action[0].copy())
-    log_episode_id.append(episode_id)
 
     if terminated or truncated:
         obs, info = env.reset()
         p.changeDynamics(DRONE_ID, -1, mass=base_mass, physicsClientId=env.CLIENT)
         PAYLOAD_APPLIED = False
         reset_count += 1
-        episode_id += 1
 
 env.close()
-log_states = np.array(log_states)
-log_actions = np.array(log_actions)
-log_episode_id = np.array(log_episode_id)
-
-# Quaternion hemisphere continuity fix: q and -q are the same rotation,
-# but the sign can flip between steps, which looks like a teleport to
-# a linear model. Cross-episode flips don't matter here since those
-# transition pairs get excluded during training anyway.
-quat = log_states[:, 3:7]
-for i in range(1, len(quat)):
-    if np.dot(quat[i], quat[i-1]) < 0:
-        quat[i] *= -1
-log_states[:, 3:7] = quat
-
-np.savez(f"{SAVE_DIR}/flight_log.npz",
-         states=log_states, actions=log_actions, episode_id=log_episode_id)
+log_states, log_actions = np.array(log_states), np.array(log_actions)
+np.savez(f"{SAVE_DIR}/flight_log.npz", states=log_states, actions=log_actions)
 
 z, roll = log_states[:, 2], log_states[:, 7]
 print(f"[{CONDITION}] Saved {log_states.shape[0]} steps, {reset_count} resets")

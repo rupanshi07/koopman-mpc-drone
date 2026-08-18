@@ -9,32 +9,13 @@ SAVE_DIR = f"data/{CONDITION}"
 data = np.load(DATA_PATH)
 states_full = data["states"]
 actions = data["actions"]
-episode_id = data["episode_id"] if "episode_id" in data else np.zeros(len(states_full))
 states = states_full[:, :16]
 
-def transform_state(x):
-    pos     = x[..., 0:3]
-    quat    = x[..., 3:7]
-    rpy     = x[..., 7:10]
-    vel     = x[..., 10:13]
-    ang_vel = x[..., 13:16]
-    rpy_trig = np.concatenate([np.sin(rpy), np.cos(rpy)], axis=-1)
-    return np.concatenate([pos, quat, rpy_trig, vel, ang_vel], axis=-1)
+X  = states[:-1]
+Xp = states[1:]
+U  = actions[:-1]
 
-# Only keep transitions where consecutive rows are truly the same episode
-same_episode = episode_id[:-1] == episode_id[1:]
-n_excluded = (~same_episode).sum()
-
-X_raw  = states[:-1][same_episode]
-Xp_raw = states[1:][same_episode]
-U      = actions[:-1][same_episode]
-
-X  = transform_state(X_raw)
-Xp = transform_state(Xp_raw)
-
-print(f"Loaded {X.shape[0]} transitions for condition: {CONDITION} "
-      f"({n_excluded} cross-episode pairs excluded)")
-print(f"Transformed state dimension: {X.shape[1]} (raw was {X_raw.shape[1]})")
+print(f"Loaded {X.shape[0]} transitions for condition: {CONDITION}")
 
 x_mean = X.mean(axis=0)
 x_std  = X.std(axis=0) + 1e-8
@@ -45,7 +26,9 @@ Xn  = (X  - x_mean) / x_std
 Xpn = (Xp - x_mean) / x_std
 Un  = (U  - u_mean) / u_std
 
-CROSS_IDX = list(range(3, 19))
+# Cross-term pairs: focus on orientation/angular-velocity coupling
+# (Q1-Q4: indices 3-6, R/P/Y: indices 7-9, WX/WY/WZ: indices 13-15)
+CROSS_IDX = list(range(3, 16))
 CROSS_PAIRS = list(combinations(CROSS_IDX, 2))
 
 def lift(x):

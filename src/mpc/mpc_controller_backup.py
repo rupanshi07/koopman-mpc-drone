@@ -1,8 +1,8 @@
 ﻿import numpy as np
 import cvxpy as cp
+from itertools import combinations
 
-N_STATE_RAW = 16
-N_STATE = 19
+N_STATE = 16
 N_ACTION = 4
 HORIZON = 6
 HOVER_RPM = 14436
@@ -20,33 +20,22 @@ def load_model(condition):
         }
     return _models[condition]
 
-def transform_state(x):
-    pos     = x[0:3]
-    quat    = x[3:7]
-    rpy     = x[7:10]
-    vel     = x[10:13]
-    ang_vel = x[13:16]
-    rpy_trig = np.concatenate([np.sin(rpy), np.cos(rpy)])
-    return np.concatenate([pos, quat, rpy_trig, vel, ang_vel])
-
 def lift(x, cross_pairs):
     quad = x**2
     cross = np.array([x[i] * x[j] for i, j in cross_pairs])
     return np.concatenate([x, quad, cross])
 
 FINAL_TARGET_Z = 0.3
-RAMP_RATE = 0.001
+RAMP_RATE = 0.001  # max height increase per control step - gentle climb, not a jump
 
-# Indices in the 19-dim transformed state:
-# pos(0-2) quat(3-6) sin_rpy(7-9) cos_rpy(10-12) vel(13-15) ang_vel(16-18)
 STATE_WEIGHT = np.ones(N_STATE)
-STATE_WEIGHT[3:7]   = 100.0
-STATE_WEIGHT[7:10]  = 100.0
-STATE_WEIGHT[10:13] = 100.0
-STATE_WEIGHT[2] = 15.0
+STATE_WEIGHT[3:7] = 100.0   # quaternion - pushed higher than before
+STATE_WEIGHT[7] = 100.0     # roll - pushed higher than before
+STATE_WEIGHT[8] = 100.0     # pitch - pushed higher than before
+STATE_WEIGHT[2] = 15.0      # height
 
 _last_u_norm = np.zeros(N_ACTION)
-_current_target_z = None
+_current_target_z = None  # tracks the gradually-ramping height target across calls
 
 def solve_mpc(current_state_raw, condition="nominal"):
     global _last_u_norm, _current_target_z
@@ -56,12 +45,15 @@ def solve_mpc(current_state_raw, condition="nominal"):
         u0_raw = _last_u_norm * model["u_std"] + model["u_mean"]
         return np.clip(u0_raw, 0, 25000)
 
+    # Initialize the ramp target at the drone's current height on first call
     if _current_target_z is None:
         _current_target_z = current_state_raw[2]
+
+    # Advance the target gradually toward the final goal, never jumping ahead
     if _current_target_z < FINAL_TARGET_Z:
         _current_target_z = min(_current_target_z + RAMP_RATE, FINAL_TARGET_Z)
 
-    target_state_raw = np.zeros(N_STATE_RAW)
+    target_state_raw = np.zeros(N_STATE)
     target_state_raw[2] = _current_target_z
     target_state_raw[6] = 1.0
 
@@ -71,14 +63,12 @@ def solve_mpc(current_state_raw, condition="nominal"):
     u_mean, u_std = model["u_mean"], model["u_std"]
     cross_pairs = model["cross_pairs"]
 
-    current_state_t = transform_state(current_state_raw)
-    target_state_t  = transform_state(target_state_raw)
-
-    x0_norm = (current_state_t - x_mean) / x_std
-    target_norm = (target_state_t - x_mean) / x_std
+    x0_norm = (current_state_raw - x_mean) / x_std
+    target_norm = (target_state_raw - x_mean) / x_std
     psi0 = lift(x0_norm, cross_pairs)
     target_lifted = lift(target_norm, cross_pairs)
 
+    N_LIFTED = A.shape[0]
     U = cp.Variable((HORIZON, N_ACTION))
 
     Q_weight = 20.0
@@ -90,8 +80,8 @@ def solve_mpc(current_state_raw, condition="nominal"):
     cost = 0
     constraints = []
     prev_u = _last_u_norm
-    psi_t = psi0
 
+    psi_t = psi0
     for t in range(HORIZON):
         psi_next = A @ psi_t + B @ U[t]
         state_error = psi_next[:N_STATE] - target_lifted[:N_STATE]

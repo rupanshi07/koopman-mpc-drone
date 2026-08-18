@@ -9,10 +9,13 @@ SAVE_DIR = f"data/{CONDITION}"
 data = np.load(DATA_PATH)
 states_full = data["states"]
 actions = data["actions"]
-episode_id = data["episode_id"] if "episode_id" in data else np.zeros(len(states_full))
 states = states_full[:, :16]
 
 def transform_state(x):
+    # Replace roll/pitch/yaw (raw radians) with sin/cos pairs.
+    # Raw Euler angles jump discontinuously (+pi -> -pi) when the drone
+    # rotates past the wraparound point, which a linear model cannot
+    # fit. sin/cos are continuous through that crossing.
     pos     = x[..., 0:3]
     quat    = x[..., 3:7]
     rpy     = x[..., 7:10]
@@ -21,19 +24,14 @@ def transform_state(x):
     rpy_trig = np.concatenate([np.sin(rpy), np.cos(rpy)], axis=-1)
     return np.concatenate([pos, quat, rpy_trig, vel, ang_vel], axis=-1)
 
-# Only keep transitions where consecutive rows are truly the same episode
-same_episode = episode_id[:-1] == episode_id[1:]
-n_excluded = (~same_episode).sum()
-
-X_raw  = states[:-1][same_episode]
-Xp_raw = states[1:][same_episode]
-U      = actions[:-1][same_episode]
+X_raw  = states[:-1]
+Xp_raw = states[1:]
+U = actions[:-1]
 
 X  = transform_state(X_raw)
 Xp = transform_state(Xp_raw)
 
-print(f"Loaded {X.shape[0]} transitions for condition: {CONDITION} "
-      f"({n_excluded} cross-episode pairs excluded)")
+print(f"Loaded {X.shape[0]} transitions for condition: {CONDITION}")
 print(f"Transformed state dimension: {X.shape[1]} (raw was {X_raw.shape[1]})")
 
 x_mean = X.mean(axis=0)
@@ -45,6 +43,8 @@ Xn  = (X  - x_mean) / x_std
 Xpn = (Xp - x_mean) / x_std
 Un  = (U  - u_mean) / u_std
 
+# Cross-term pairs over: quaternion(3-6), sin_rpy(7-9), cos_rpy(10-12),
+# velocity(13-15), angular velocity(16-18)
 CROSS_IDX = list(range(3, 19))
 CROSS_PAIRS = list(combinations(CROSS_IDX, 2))
 
