@@ -401,6 +401,73 @@ All reported results in Â§3 reflect the corrected pipeline. Git tags
 `before-target-and-payload-fix` and `corrected-final-results` mark the exact commits
 before and after these corrections for full reproducibility.
 
+## 5.1 Preliminary Investigation: Rotation-Matrix-Based Lifting (Future Work, Started)
+
+Following the diagnosis in §4 and the SE(3) Koopman-MPC literature (Narayanan et al.,
+2023), a preliminary investigation was carried out into whether replacing the
+Euler-angle/quaternion-based lifting function with a rotation-matrix-based one would
+resolve the orientation instability. This section reports that investigation
+honestly, as a **started but not completed** line of work, not a finished result.
+
+**What was done.** Rotation matrices $R \in SO(3)$ were computed directly from the
+existing quaternion data (no new flight data was required for this step, since a
+quaternion and its corresponding rotation matrix describe the same physical
+orientation). A new, more compact lifting function was built, following the
+literature's approach:
+
+$$
+\psi_{\text{rotmat}}(\mathbf{x}) = \big[\ \mathbf{p},\ \ \mathbf{v},\ \ \text{vec}(R),\ \ R\boldsymbol{\omega},\ \ R\boldsymbol{\omega}^{\circ 2}\ \big] \in \mathbb{R}^{21}
+$$
+
+where $\mathbf{p}$ and $\mathbf{v}$ are position and velocity, $\text{vec}(R)$ is the
+flattened $3\times 3$ rotation matrix (9 entries), and $R\boldsymbol{\omega}$,
+$R\boldsymbol{\omega}^{\circ 2}$ are the rotation matrix applied to angular velocity
+and its elementwise square, respectively — this is a substantially smaller,
+physics-motivated lift (21 dimensions) compared to the original 110-dimensional
+polynomial expansion. A new Koopman model was trained on this lifting function using
+the existing nominal flight data.
+
+**What was found.** Position and velocity prediction remained excellent (RMSE 0.0007
+and 0.0302, normalized), consistent with the original model. Overall rotation-matrix
+prediction RMSE was 0.1355 — comparable to or better than the original quaternion
+model's weaker orientation dimensions. However, when evaluated specifically on the
+most tilted 10% of the (calm, PID-stabilized) training data, RMSE increased to 0.2540
+— a real, measurable degradation under tilt, though the tilt magnitudes present in
+this dataset (up to roughly 8°) are far short of the near-flip orientations
+(beyond 90°) observed during the actual MPC failure in §3–4.
+
+**Why this is reported as inconclusive, not as a fix.** The existing training data was
+collected under calm, PID-stabilized flight specifically to keep the drone upright
+(§2.1), and as a result contains very few examples of extreme tilt. This means the
+present test cannot yet distinguish whether the rotation-matrix representation
+genuinely avoids the singularity problem under the severe orientations relevant to
+the actual failure mode, or whether it too would degrade given data that actually
+covers that regime. A properly conclusive test requires training data that
+deliberately spans a much wider range of roll/pitch angles, which was not collected
+as part of this project.
+
+## 5.2 Future Work
+
+Two concrete, well-scoped next steps follow directly from this project's findings:
+
+1. **Collect extreme-tilt training data and properly re-evaluate the rotation-matrix
+   lifting function.** Fly (or safely simulate) trajectories that deliberately cover
+   a wide range of roll and pitch angles, well beyond the mild tilts present in the
+   current dataset, retrain the rotation-matrix Koopman model on this richer data,
+   and re-run the same tilted-subset RMSE evaluation performed in §5.1 to determine
+   whether prediction accuracy holds up under genuinely severe orientation, not just
+   mild wobble.
+2. **If §1 confirms improved accuracy under extreme tilt, rewrite the MPC controller's
+   cost function to operate on rotation-matrix error rather than quaternion/Euler-angle
+   error.** This requires a genuinely different distance metric between orientations
+   (rotation matrices lie on the curved $SO(3)$ manifold, not flat vector space, so
+   ordinary Euclidean distance between matrices is not the mathematically correct
+   comparison — a manifold-appropriate distance, such as the geodesic distance or the
+   trace-based angular distance used in the SE(3) Koopman-MPC literature, would be
+   needed), and re-running the full disturbance-scenario comparison (§3) against PID
+   and LQR under this new representation to determine whether it resolves the crash
+   behavior documented in this report.
+
 ---
 
 ## 6. Conclusion
