@@ -1,4 +1,4 @@
-<p align="center">
+﻿<p align="center">
   <img src="assets/amrita_logo.jpeg" alt="Amrita Vishwa Vidyapeetham" width="450"/>
 </p>
 
@@ -32,8 +32,7 @@
 | `results/` | All `.npz` flight logs, tracking plots, and metrics CSVs for MPC, PID, and LQR |
 | `results/analysis/` | Final metrics tables and the analysis-specific findings notes |
 | `results/plots_updated/` | Corrected, current Z-tracking comparison plots (all 3 controllers, all 6 scenarios) |
-| `results/analysis/pivot_vs_free_flight.*` | Pivot-constrained vs free-flight stability comparison (§3.5) |
-| `README.md` | This file — full project report |
+| `README.md` | This file "” full project report |
 
 ---
 
@@ -43,14 +42,14 @@ Model Predictive Control (MPC) built on a Koopman-operator linearization of nonl
 quadrotor dynamics has been proposed in recent literature as a way to obtain fast,
 real-time-capable control without deriving an exact first-principles model of the
 system. This project replicates the Koopman-based control approach of Oh et al.
-(IEEE Access, 2024) — including their Extended Dynamic Mode Decomposition (EDMD)
-system identification and environment-selector architecture — in the
+(IEEE Access, 2024) "” including their Extended Dynamic Mode Decomposition (EDMD)
+system identification and environment-selector architecture "” in the
 `gym-pybullet-drones` simulation environment, and extends it in two directions absent
 from the base paper: (i) systematic disturbance testing under both wind and a
 mid-flight payload addition, and (ii) a genuine comparison against classical PID and
 Linear-Quadratic-Regulator (LQR) baseline controllers. Through iterative empirical
 testing, we identify and diagnose a persistent orientation instability in the
-Koopman-MPC controller — the drone tips and loses attitude control consistently
+Koopman-MPC controller "” the drone tips and loses attitude control consistently
 within one second of flight, independent of any applied disturbance. Isolated hover
 tests (zero climb, zero disturbance) reproduce the same failure, indicating the
 instability is a structural property of the Euler-angle/quaternion-based Koopman
@@ -68,8 +67,8 @@ suggests would resolve it.
 
 ## 1. Introduction
 
-Multirotor drones are increasingly deployed for applications — package delivery,
-inspection, agriculture — where payload mass and wind conditions vary unpredictably
+Multirotor drones are increasingly deployed for applications "” package delivery,
+inspection, agriculture "” where payload mass and wind conditions vary unpredictably
 during flight. Classical model-based controllers (PID, LQR) are simple and robust but
 are typically tuned around a fixed nominal model of the vehicle; when the true
 dynamics deviate substantially (e.g., due to a sudden mass change), performance can
@@ -81,7 +80,7 @@ dynamical system as a (possibly infinite-dimensional) *linear* operator acting o
 space of observable functions of the state. In practice, a finite-dimensional
 approximation is obtained via Extended Dynamic Mode Decomposition (EDMD), and the
 resulting linear model is used inside a standard, convex Model Predictive Control
-(MPC) formulation — avoiding the nonlinear optimization that a first-principles
+(MPC) formulation "” avoiding the nonlinear optimization that a first-principles
 model would otherwise require.
 
 **Base paper.** This project replicates and extends Oh, Lee, and Moon (2024),
@@ -96,13 +95,13 @@ controller).
 
 **This project's contribution / novelty.**
 
-1. **Payload disturbance testing** — a mid-flight mass addition (not present in the
+1. **Payload disturbance testing** "” a mid-flight mass addition (not present in the
    base paper), tested independently and in combination with wind.
-2. **A genuine classical-control baseline** — PID (via `gym-pybullet-drones`'
+2. **A genuine classical-control baseline** "” PID (via `gym-pybullet-drones`'
    built-in `DSLPIDControl`) and a discrete-time LQR controller, evaluated on the
    *same* six disturbance scenarios as the Koopman-MPC controller, with matched
    targets and a crash-aware metrics pipeline.
-3. **An evidenced limitation finding** — through systematic isolation testing, we
+3. **An evidenced limitation finding** "” through systematic isolation testing, we
    show the Koopman-MPC controller's instability is independent of disturbance type
    or target height, and connect it to a known representational issue in the
    literature.
@@ -118,15 +117,15 @@ The project pipeline consists of six stages.
 Flight data is collected in `gym-pybullet-drones` (CF2X quadrotor model, PyBullet
 physics) under three conditions:
 
-- **Nominal** — no external disturbance.
-- **Windy** — a constant horizontal force disturbance.
-- **Payload** — additional mass introduced mid-flight.
+- **Nominal** "” no external disturbance.
+- **Windy** "” a constant horizontal force disturbance.
+- **Payload** "” additional mass introduced mid-flight.
 
 A PID-stabilized controller (`DSLPIDControl`) flies to randomized position/height
 setpoints during data collection. This was found necessary empirically: driving the
 four motors with independent random RPM noise (a natural first choice for exciting
 system dynamics) caused the drone to tumble (roll standard deviation $\sigma_\phi
-\approx 0.73$ rad, full $\pm\pi$ excursions) rather than fly — data collected this way
+\approx 0.73$ rad, full $\pm\pi$ excursions) rather than fly "” data collected this way
 is unusable for identifying *flight* dynamics. Flying to randomized setpoints under
 PID stabilization keeps the drone upright ($\sigma_\phi \approx 0.08$ rad) while still
 covering a wide height range for the Koopman model to learn from.
@@ -196,7 +195,7 @@ $$
 where $T$ is total thrust, $R(\mathbf{q})$ is the rotation matrix corresponding to
 quaternion $\mathbf{q}$, $I$ is the inertia tensor, and $\mathbf{F}_{\text{dist}}$
 represents an external disturbance force (e.g. wind). The Koopman/EDMD model does not
-use this equation directly — it is learned from data — but it explains why
+use this equation directly "” it is learned from data "” but it explains why
 orientation/angular-velocity cross-terms are needed in the lifting function: the
 $\boldsymbol{\omega} \times (I\boldsymbol{\omega})$ term is itself a bilinear coupling
 between angular-velocity components.
@@ -207,7 +206,7 @@ At each control step, given the current state $\mathbf{x}_0$ and a target state
 $\mathbf{x}_{\text{ref}}$, the controller solves a receding-horizon quadratic program
 over the lifted dynamics. The lifted trajectory is *substituted directly* into the
 cost (rather than carried as a free optimization variable subject to equality
-constraints) — an early formulation using free lifted-state variables was found to be
+constraints) "” an early formulation using free lifted-state variables was found to be
 numerically fragile, causing the QP solver to fail on nearly every call in practice:
 
 $$
@@ -219,7 +218,7 @@ $$
 $$
 
 where $W$ is a per-dimension weight vector that penalizes orientation error
-(quaternion, roll, pitch) more heavily than other states — added after empirically
+(quaternion, roll, pitch) more heavily than other states "” added after empirically
 observing that a uniform weight allowed the controller to sacrifice orientation
 stability for marginal height-tracking gains, leading to the drone tipping over.
 $H = 6$ is the prediction horizon; the QP is solved with `cvxpy`/OSQP at each control
@@ -268,9 +267,9 @@ $$
 and solves the discrete algebraic Riccati equation for the optimal gain $K$ minimizing
 $\sum_k \mathbf{x}_k^\top Q \mathbf{x}_k + R\,\delta T_k^2$. Both baselines are run
 through the *identical* six scenarios, targeting the *identical* height setpoint as
-the Koopman-MPC controller — this consistency was verified explicitly after an
+the Koopman-MPC controller "” this consistency was verified explicitly after an
 earlier version of the experiment was found to have a target-height mismatch between
-controllers (see §5).
+controllers (see Â§5).
 
 ---
 
@@ -279,7 +278,7 @@ controllers (see §5).
 ### 3.1 Final Comparison Metrics
 
 Computed with crash-aware truncation (metrics are computed only up to the first
-failure event — ground contact, a roll/pitch flip beyond 90Â°, or a simulator reset —
+failure event "” ground contact, a roll/pitch flip beyond 90Â°, or a simulator reset "”
 so that post-crash artifacts do not silently corrupt the reported numbers):
 
 | Scenario | Controller | RMSE (m) | Settling Time (s) | Control Effort (RMS RPM) | Max Transient Dev. (m) | Crashed | Failure Time (s) |
@@ -305,7 +304,7 @@ so that post-crash artifacts do not silently corrupt the reported numbers):
 
 **Bold** marks the best (lowest) value per scenario per metric. Across every metric,
 in every scenario, PID or LQR wins; Koopman-MPC does not win a single metric in any
-scenario, and does not complete any scenario (see completion rate, §3.2).
+scenario, and does not complete any scenario (see completion rate, Â§3.2).
 
 ### 3.2 Completion Rate
 
@@ -320,8 +319,8 @@ complete 100% of every scenario.
 `scenario_6_z_tracking.png`)*
 
 PID and LQR both climb smoothly to the 0.3 m target and hold steady, including
-sensible recovery after mid-flight payload addition (scenario 5/6: PID settles ≈0.23
-m, LQR ≈0.27 m post-payload — both closer to target than a naively re-tuned
+sensible recovery after mid-flight payload addition (scenario 5/6: PID settles â‰ˆ0.23
+m, LQR â‰ˆ0.27 m post-payload "” both closer to target than a naively re-tuned
 controller would achieve without adaptation). Koopman-MPC climbs briefly, then tips
 past 90Â° roll and lands, in every scenario.
 
@@ -330,52 +329,14 @@ past 90Â° roll and lands, in every scenario.
 To determine whether the Koopman-MPC failure was specific to disturbance conditions
 or aggressive height targets, an isolated test was run: the controller was asked to
 hold its own *starting* height (zero commanded climb) with *zero* disturbance
-applied. The instability persisted — roll grew unbounded even under this minimal-demand
+applied. The instability persisted "” roll grew unbounded even under this minimal-demand
 condition, ruling out disturbance response or target aggressiveness as the cause.
 
 *(Figure: `results/plots/notebook_hover_instability.png`)*
 
-This isolates the failure to the controller/model itself — specifically, to the
+This isolates the failure to the controller/model itself "” specifically, to the
 Euler-angle/quaternion-based orientation representation used in the Koopman lifting
-function — rather than to any disturbance-testing methodology in this project.
-
-### 3.5 Pivot-Constrained Validation (Isolating the Coupling Mechanism)
-
-To directly test *why* Oh et al.'s own validation (a Quanser 3 DOF Hover rig —
-a fixed-base, pivot-mounted platform that permits rotation about roll/pitch/yaw
-but physically cannot translate) did not surface this instability, we replicated
-their mechanical constraint in simulation. A `pybullet` point-to-point constraint
-was attached at the drone's body origin, locking translational position while
-leaving all three rotational degrees of freedom free — mechanically equivalent
-to the Quanser rig's pivot joint.
-
-A new Koopman model was trained under this constraint, using the same near-hover
-excitation philosophy as the free-flight data (small-amplitude random RPM
-perturbation about hover, not aggressive full-range excitation), with the same
-EDMD lifting structure and identical hyperparameters. The resulting controller
-was then run for the same 15-second duration used in §3.1"“3.3.
-
-| Run | Roll max (rad) | Roll σ | Pitch max (rad) | Outcome |
-|---|---|---|---|---|
-| Free flight, S1"“S6 (all) | 3.1416 (π) | 1.16"“1.56 | 1.44 | Crashes, every scenario |
-| Pivot-constrained | 0.009 | 0.004 | 0.001 | Stable, full 15s |
-
-Every free-flight scenario — independent of wind, payload, or their combination —
-saturates roll at exactly π (a full flip) with high variance. The pivot-constrained
-run, using the same controller architecture and a comparably narrow training
-distribution, remains stable to within a fraction of a degree for the entire run.
-
-Because both conditions share the same lifting function, the same near-hover
-training philosophy, and the same MPC formulation, and differ *only* in whether
-translation is mechanically free, this isolates the coupling between translational
-and rotational dynamics — present in free 6-DOF flight, absent on a fixed
-pivot — as the mechanism that exposes the instability, rather than data quality
-or excitation signal design alone. This also explains why Oh et al.'s own
-validation platform did not detect the same failure mode we observe: a pivot-mounted
-rig cannot express the position-attitude feedback loop that drives the crash.
-
-*(Figure: `results/analysis/pivot_vs_free_flight.png`; data:
-`results/analysis/pivot_vs_free_flight.csv`)*
+function "” rather than to any disturbance-testing methodology in this project.
 
 ---
 
@@ -383,7 +344,7 @@ rig cannot express the position-attitude feedback loop that drives the crash.
 
 The base paper's Koopman-MPC approach, faithfully replicated here (same state
 representation, same EDMD lifting structure, same environment-selector logic), is
-reproducible and its data-driven modeling pipeline (§2.1"“§2.2) achieves low one-step
+reproducible and its data-driven modeling pipeline (Â§2.1"“Â§2.2) achieves low one-step
 prediction error on position, velocity, and orientation states (normalized RMSE
 $\approx 0.19$"“$0.27$ across conditions after correcting known excitation-signal
 instabilities during data collection). The failure occurs specifically at the *control*
@@ -400,18 +361,6 @@ is identified as the concrete next step for this project, though it requires
 retraining the Koopman model on a re-derived state representation and is left as
 future work to preserve fidelity to the base paper's stated methodology.
 
-The pivot-constrained validation (§3.5) refines this diagnosis further: the same
-lifting function and a comparably narrow training distribution produce a *stable*
-controller once translation is mechanically decoupled from rotation. This indicates
-the instability is not purely a static property of the Euler-angle/quaternion
-representation in isolation, but is triggered specifically by the position-attitude
-feedback loop inherent to free 6-DOF flight — a small attitude error tilts the
-thrust vector, which perturbs position, which the linear model (fit on near-hover
-data) increasingly mispredicts as the state moves outside its training
-distribution, compounding the original attitude error. A pivot-mounted rig such as
-Oh et al.'s Quanser 3 DOF Hover structurally cannot enter this loop, which is
-consistent with why their reported results do not exhibit this failure mode.
-
 ---
 
 ## 5. Verification and Reproducibility Notes
@@ -420,7 +369,7 @@ In the interest of transparency, two significant bugs were found and corrected d
 this project's own internal verification process, prior to reporting final results:
 
 1. **Target-height mismatch.** `mpc_controller.py`'s target was found to be
-   mismatched (0.1125 m — the drone's own starting height) against the 0.3 m target
+   mismatched (0.1125 m "” the drone's own starting height) against the 0.3 m target
    used by the PID/LQR baselines and the metrics pipeline, invalidating any
    RMSE/tracking comparison computed before the fix. Corrected by unifying the target
    to 0.3 m across all three controllers and the metrics script, and regenerating all
@@ -448,7 +397,7 @@ this project's own internal verification process, prior to reporting final resul
    selector's first 5-second classification window ever executes — MPC never lives
    long enough for this bug to have affected its own reported numbers.
 
-All reported results in §3 reflect the corrected pipeline. Git tags
+All reported results in Â§3 reflect the corrected pipeline. Git tags
 `before-target-and-payload-fix` and `corrected-final-results` mark the exact commits
 before and after these corrections for full reproducibility.
 
@@ -458,7 +407,7 @@ before and after these corrections for full reproducibility.
 
 This project replicates a Koopman-operator-based MPC control system for quadrotors
 (Oh et al., 2024) and extends it with payload disturbance testing and a genuine
-classical-control baseline comparison — both absent from the base paper. Under a
+classical-control baseline comparison "” both absent from the base paper. Under a
 rigorously verified, fair experimental setup, the replicated Koopman-MPC controller
 is found to be reliably unstable, tipping over within approximately half a second of
 flight regardless of disturbance type, while PID and LQR baselines complete every
@@ -486,4 +435,4 @@ literature-grounded next step to resolve it.
 
 ---
 
-<p align="center"><i>Amrita Vishwa Vidyapeetham — Group CD7 — Drones, Semester 5</i></p>
+<p align="center"><i>Amrita Vishwa Vidyapeetham "” Group CD7 "” Drones, Semester 5</i></p>
