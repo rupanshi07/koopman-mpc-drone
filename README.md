@@ -202,9 +202,7 @@ between angular-velocity components.
 
 ### 2.3 MPC Controller
 
-At each control step, given the current state $\mathbf{x}_0$ and a target state
-$\mathbf{x}_{\text{ref}}$, the controller solves a receding-horizon quadratic program
-over the lifted dynamics. The lifted trajectory is *substituted directly* into the
+At each control step, given the current state **x₀** and a target state **x<sub>ref</sub>**, the controller solves a receding-horizon quadratic program over the lifted dynamics. The lifted trajectory is *substituted directly* into the
 cost (rather than carried as a free optimization variable subject to equality
 constraints) "” an early formulation using free lifted-state variables was found to be
 numerically fragile, causing the QP solver to fail on nearly every call in practice:
