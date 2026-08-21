@@ -15,8 +15,8 @@
 |---|---|---|
 | Rupanshi Sangwan | CB.SC.U4AIE24262 | cb.sc.u4aie24262@cb.amrita.students.edu |
 | Devana Madhavan | CB.SC.U4AIE24213 | cb.sc.u4aie24213@cb.amrita.students.edu |
-| Indraneel | CB.SC.U4AIE24323 | cb.sc.u4aie24323@cb.amrita.students.edu |
-| Aditya UK | CB.SC.U4AIE24302 | cb.sc.u4aie24302@cb.amrita.students.edu |
+| Indraneel R | CB.SC.U4AIE24323 | cb.sc.u4aie24323@cb.amrita.students.edu |
+| Adithya U K | CB.SC.U4AIE24302 | cb.sc.u4aie24302@cb.amrita.students.edu |
 
 ---
 
